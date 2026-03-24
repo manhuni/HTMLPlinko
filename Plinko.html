@@ -10,6 +10,13 @@
   <div class="wrap">
     <section class="card left">
       <h1>Plinko — Provably‑Fair Style Demo</h1>
+      <div class="row">
+        <label>Play Mode</label>
+        <select id="playMode" class="grow">
+          <option value="player" selected>Player</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
       <div class="row"><label>Rows</label><div class="grow"><input id="rows" type="range" min="8" max="16" value="12"/></div><div class="pill"><span id="rowsOut">12</span></div></div>
       <div class="row"><label>Start Pins</label><div class="grow"><input id="startPins" type="range" min="1" max="12" value="7"/></div><div class="pill"><span id="startPinsOut">7</span></div></div>
       <div class="row">
@@ -27,27 +34,27 @@
       <div class="row"><label>Bet</label><input id="bet" type="number" min="0.01" step="0.01" value="1.00"/></div>
       <div class="row"><label>Ball -> Row 1 Gap</label><div class="grow"><input id="dropOffset" type="range" min="0" max="160" step="2" value="100"/></div><div class="pill"><span id="dropOffsetOut">100px</span></div></div>
       <div class="row"><label>Drop Zone Width</label><div class="grow"><input id="dropWidth" type="range" min="1" max="100" step="1" value="100"/></div><div class="pill"><span id="dropWidthOut">100%</span></div></div>
-      <div class="row">
+      <div class="row admin-only">
         <label>Spawn Mode</label>
         <select id="spawnMode" class="grow">
-          <option value="random">Random</option>
-          <option value="preset" selected>Preset Position</option>
+          <option value="random" selected>Random</option>
+          <option value="preset">Preset Position</option>
         </select>
       </div>
-      <div class="row"><label>Spawn Position</label><div class="grow"><input id="spawnPos" type="range" min="0" max="100" step="1" value="50"/></div><div class="pill"><span id="spawnPosOut">50%</span></div></div>
+      <div class="row admin-only"><label>Spawn Position</label><div class="grow"><input id="spawnPos" type="range" min="0" max="100" step="1" value="50"/></div><div class="pill"><span id="spawnPosOut">50%</span></div></div>
       <div class="row"><label>Ball Speed</label><div class="grow"><input id="speed" type="range" min="0.5" max="5" step="0.1" value="1.8"/></div><div class="pill"><span id="speedOut">1.8×</span></div></div>
       <div class="row"><label>Spacing X</label><div class="grow"><input id="spacingX" type="range" min="0.7" max="1.8" step="0.05" value="1"/></div><div class="pill"><span id="spacingXOut">1.00×</span></div></div>
       <div class="row"><label>Spacing Y</label><div class="grow"><input id="spacingY" type="range" min="0.7" max="1.8" step="0.05" value="1"/></div><div class="pill"><span id="spacingYOut">1.00×</span></div></div>
       <div class="row"><label>Slot Font Size</label><div class="grow"><input id="slotFontSize" type="range" min="9" max="22" step="1" value="12"/></div><div class="pill"><span id="slotFontSizeOut">12px</span></div></div>
       <div class="row"><label>Pins Per Row</label><input id="rowPins" type="text" value="7,8,9,10,11,12,11,12,11,12,11,12" placeholder="vd: 7,8,9,10,11,12,11,12,11,12,11,12"/></div>
-      <div class="row">
+      <div class="row admin-only">
         <label>Result Mode</label>
         <select id="resultMode" class="grow">
-          <option value="random">Random</option>
-          <option value="preset" selected>Preset Slot</option>
+          <option value="random" selected>Random</option>
+          <option value="preset">Preset Slot</option>
         </select>
       </div>
-      <div class="row"><label>Target Slot (0 = left)</label><input id="targetSlot" type="number" min="0" step="1" value="0"/></div>
+      <div class="row admin-only"><label>Target Slot (0 = left)</label><input id="targetSlot" type="number" min="0" step="1" value="0"/></div>
       <div class="stack">
         <button id="drop" class="btn grow">Drop Ball</button>
         <button id="auto10" class="btn ghost">Auto ×10</button>
@@ -69,6 +76,7 @@
 
     <section class="card">
       <div class="stage" id="stage">
+        <div id="testBadge" class="test-badge hidden">TEST MODE</div>
         <canvas id="board"></canvas>
       </div>
       <div class="meter" id="meter"></div>

@@ -76,6 +76,7 @@ ro.observe(stage);
 
 // ---------- State ----------
 const ui = {
+  playMode: document.getElementById('playMode'),
   rows: document.getElementById('rows'), rowsOut: document.getElementById('rowsOut'),
   startPins: document.getElementById('startPins'), startPinsOut: document.getElementById('startPinsOut'),
   risk: document.getElementById('risk'), rtp: document.getElementById('rtp'), rtpOut: document.getElementById('rtpOut'),
@@ -98,10 +99,13 @@ const ui = {
   edgeBias: document.getElementById('edgeBias'), edgeBiasOut: document.getElementById('edgeBiasOut'),
   winpct: document.getElementById('winpct'),
   houseEdge: document.getElementById('houseEdge'), houseEdgeOut: document.getElementById('houseEdgeOut'),
-  house: document.getElementById('house')
+  house: document.getElementById('house'),
+  testBadge: document.getElementById('testBadge')
 };
+const adminControls = Array.from(document.querySelectorAll('.admin-only'));
 
 let state = {
+  playMode: ui.playMode.value,
   rows: +ui.rows.value,
   startPins: +ui.startPins.value,
   risk: ui.risk.value,
@@ -116,7 +120,7 @@ let state = {
   spacingY: +ui.spacingY.value,
   slotFontSize: +ui.slotFontSize.value,
   rowPins: [],
-  resultMode: 'preset',
+  resultMode: 'random',
   targetSlot: 0,
   balance: 1000000,
   profit: 0,
@@ -145,6 +149,15 @@ let state = {
 function radii(){ return { BALL: 8*dpr, PEG: 6*dpr }; }
 
 function rebuild(){
+  state.playMode = ui.playMode.value;
+  const isAdmin = state.playMode === 'admin';
+  if(!isAdmin){
+    ui.spawnMode.value = 'random';
+    ui.resultMode.value = 'random';
+  }
+  for(const el of adminControls) el.classList.toggle('hidden', !isAdmin);
+  ui.testBadge.classList.toggle('hidden', !isAdmin);
+
   state.rows=+ui.rows.value; ui.rowsOut.textContent=state.rows;
   state.startPins = +ui.startPins.value; ui.startPinsOut.textContent = state.startPins;
   state.risk=ui.risk.value;
@@ -154,7 +167,7 @@ function rebuild(){
   state.seed=ui.seed.value;
   state.dropOffset = +ui.dropOffset.value; ui.dropOffsetOut.textContent = `${state.dropOffset.toFixed(0)}px`;
   state.dropWidth = Math.max(1, Math.min(100, +ui.dropWidth.value || 100)); ui.dropWidthOut.textContent = `${state.dropWidth.toFixed(0)}%`;
-  state.spawnMode = ui.spawnMode.value;
+  state.spawnMode = isAdmin ? ui.spawnMode.value : 'random';
   state.spawnPos = Math.max(0, Math.min(100, +ui.spawnPos.value || 50));
   ui.spawnPos.value = String(state.spawnPos);
   ui.spawnPosOut.textContent = `${state.spawnPos.toFixed(0)}%`;
@@ -162,7 +175,7 @@ function rebuild(){
   state.spacingX = +ui.spacingX.value; ui.spacingXOut.textContent = state.spacingX.toFixed(2)+'×';
   state.spacingY = +ui.spacingY.value; ui.spacingYOut.textContent = state.spacingY.toFixed(2)+'×';
   state.slotFontSize = +ui.slotFontSize.value; ui.slotFontSizeOut.textContent = `${state.slotFontSize}px`;
-  state.resultMode = ui.resultMode.value;
+  state.resultMode = isAdmin ? ui.resultMode.value : 'random';
   state.targetSlot = Math.max(0, Math.round(+ui.targetSlot.value || 0));
   state.rowPins = buildRowPins(state.rows, state.startPins, ui.rowPins.value);
   // Keep user-defined values, auto-fill missing rows with defaults, and mirror back to input.
@@ -632,6 +645,7 @@ function runSelfTests(){ const out = []; const ok = (name, cond)=> out.push(`${c
 
 // ---------- Wiring ----------
 ui.rows.addEventListener('input', rebuild);
+ui.playMode.addEventListener('change', rebuild);
 ui.startPins.addEventListener('input', ()=>{
   // Regenerate row pins from startPins defaults for immediate layout change.
   ui.rowPins.value = '';
