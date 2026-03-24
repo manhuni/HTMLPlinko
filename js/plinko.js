@@ -380,6 +380,99 @@ const physics = {
   floorBounce: 0.35
 };
 
+function simulateLanding(startX, startY, initVx, nonce, targetSlot){
+  const {BALL} = radii();
+  const rng = makeRNG(state.seed, nonce);
+  const sim = { x:startX, y:startY, vx:initVx, vy:0, floorHits:0, rng };
+  const simDt = 1/120;
+  const maxSteps = 1800;
+  let best = 0, bestd = Infinity;
+
+  for(let step=0; step<maxSteps; step++){
+    sim.vy += physics.gravity * state.speed * (dpr/1) * simDt;
+    sim.vx += (sim.rng() - 0.5) * 22 * simDt * state.speed;
+    sim.x += sim.vx * simDt;
+    sim.y += sim.vy * simDt;
+    sim.vx *= physics.friction;
+
+    const env = getEnvelopeAtY(sim.y);
+    const minX = env.min + BALL;
+    const maxX = env.max - BALL;
+    if(sim.x < minX){ sim.x = minX; sim.vx = Math.abs(sim.vx) * 0.35; }
+    if(sim.x > maxX){ sim.x = maxX; sim.vx = -Math.abs(sim.vx) * 0.35; }
+
+    for(const row of state.pegs){
+      for(const p of row){
+        const dx = sim.x - p.x, dy = sim.y - p.y;
+        const dist = Math.hypot(dx,dy);
+        const minD = BALL + p.r;
+        if(dist>0 && dist < minD){
+          const nX = dx/dist, nY = dy/dist;
+          const overlap = (minD - dist) + 0.01;
+          sim.x += nX * overlap;
+          sim.y += nY * overlap;
+          const vn = sim.vx*nX + sim.vy*nY;
+          sim.vx -= (1+physics.restitution)*vn*nX;
+          sim.vy -= (1+physics.restitution)*vn*nY;
+          sim.vx += (sim.rng()-0.5) * 24 * state.speed;
+        }
+      }
+    }
+
+    const floor = state.floorY - BALL;
+    if(sim.y >= floor){
+      sim.y = floor;
+      sim.floorHits++;
+      if(Math.abs(sim.vy) > 110 && sim.floorHits <= 4){
+        sim.vy = -Math.abs(sim.vy) * physics.floorBounce;
+        sim.vx *= 0.82;
+      }else{
+        for(let i=0;i<state.slotsX.length;i++){
+          const d = Math.abs(sim.x - state.slotsX[i]);
+          if(d<bestd){ bestd=d; best=i; }
+        }
+        return {slot:best, x:sim.x, dist:Math.abs(best - targetSlot)};
+      }
+    }
+  }
+
+  for(let i=0;i<state.slotsX.length;i++){
+    const d = Math.abs(sim.x - state.slotsX[i]);
+    if(d<bestd){ bestd=d; best=i; }
+  }
+  return {slot:best, x:sim.x, dist:Math.abs(best - targetSlot)};
+}
+
+function solvePresetInitialVx(startX, startY, targetSlot, nonce){
+  // Search initial horizontal velocity so pure physics lands on target slot.
+  const maxV = 1200 * state.speed;
+  let bestVx = 0;
+  let bestErr = Infinity;
+  let bestDistX = Infinity;
+
+  const test = (vx)=>{
+    const r = simulateLanding(startX, startY, vx, nonce, targetSlot);
+    const err = Math.abs(r.slot - targetSlot);
+    const dx = Math.abs((state.slotsX[targetSlot] ?? startX) - r.x);
+    if(err < bestErr || (err === bestErr && dx < bestDistX)){
+      bestErr = err;
+      bestDistX = dx;
+      bestVx = vx;
+    }
+  };
+
+  for(let i=0;i<=20;i++){
+    const t = i/20;
+    test(-maxV + (2*maxV*t));
+  }
+  const refineSpan = Math.max(80, maxV * 0.22);
+  for(let i=0;i<=14;i++){
+    const t = i/14;
+    test((bestVx - refineSpan) + (2*refineSpan*t));
+  }
+  return bestVx;
+}
+
 function spawnBall(){
   const rng = makeRNG(state.seed, state.nonce);
   const spawnCfg = getSpawnConfig(rng);
@@ -388,12 +481,15 @@ function spawnBall(){
 
   const targetSlot = pickTargetSlot();
   const targetX = state.slotsX[targetSlot] ?? (W/2);
+  const initialVx = state.resultMode === 'preset'
+    ? solvePresetInitialVx(startX, spawnY, targetSlot, state.nonce)
+    : (rng() - 0.5) * 180 * state.speed;
   const b = {
     x: startX, y: spawnY,
-    vx: 0, vy: 0,
+    vx: initialVx, vy: 0,
     rng,
     finished: false, slot: null, removeAt: null,
-    targetSlot, targetX, floorHits: 0, correctionHits: 0
+    targetSlot, targetX, floorHits: 0
   };
   state.balls.push(b);
 }
@@ -409,16 +505,8 @@ function stepAll(ts){
 
     // Gravity integration.
     b.vy += g*dt;
-
-    // In preset mode, gently steer to target while keeping physics collisions.
-    if(state.resultMode === 'preset'){
-      const toward = b.targetX - b.x;
-      const steer = Math.max(-480, Math.min(480, toward * 2.8));
-      b.vx += steer * dt;
-    }else{
-      // Random micro drift for natural movement.
-      b.vx += (b.rng() - 0.5) * 28 * dt * state.speed;
-    }
+    // Shared micro drift for both modes so motion style stays consistent.
+    b.vx += (b.rng() - 0.5) * 22 * dt * state.speed;
 
     b.x += b.vx*dt;
     b.y += b.vy*dt;
@@ -464,17 +552,6 @@ function stepAll(ts){
           const d = Math.abs(b.x - xs[i]);
           if(d<bestd){bestd=d; best=i;}
         }
-        if(state.resultMode === 'preset' && best !== b.targetSlot && b.correctionHits < 8){
-          // No teleport/snap: bounce and correct until ball naturally enters target slot.
-          const toward = (b.targetX - b.x);
-          const dir = toward >= 0 ? 1 : -1;
-          b.correctionHits++;
-          b.vy = -(260 + 22*b.correctionHits) * (0.9 + 0.1*state.speed);
-          b.vx = dir * Math.min(820, Math.abs(toward)*3.5 + 120);
-          b.x += dir * Math.min(state.colGap*0.12, 10*dpr);
-          continue;
-        }
-
         b.vx = 0;
         b.vy = 0;
         b.slot = best;
