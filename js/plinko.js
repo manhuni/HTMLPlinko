@@ -76,22 +76,17 @@ ro.observe(stage);
 
 // ---------- State ----------
 const ui = {
-  playMode: document.getElementById('playMode'),
   rows: document.getElementById('rows'), rowsOut: document.getElementById('rowsOut'),
   startPins: document.getElementById('startPins'), startPinsOut: document.getElementById('startPinsOut'),
   risk: document.getElementById('risk'), rtp: document.getElementById('rtp'), rtpOut: document.getElementById('rtpOut'),
   seed: document.getElementById('seed'), bet: document.getElementById('bet'),
   dropOffset: document.getElementById('dropOffset'), dropOffsetOut: document.getElementById('dropOffsetOut'),
   dropWidth: document.getElementById('dropWidth'), dropWidthOut: document.getElementById('dropWidthOut'),
-  spawnMode: document.getElementById('spawnMode'),
-  spawnPos: document.getElementById('spawnPos'), spawnPosOut: document.getElementById('spawnPosOut'),
   speed: document.getElementById('speed'), speedOut: document.getElementById('speedOut'),
   spacingX: document.getElementById('spacingX'), spacingXOut: document.getElementById('spacingXOut'),
   spacingY: document.getElementById('spacingY'), spacingYOut: document.getElementById('spacingYOut'),
   slotFontSize: document.getElementById('slotFontSize'), slotFontSizeOut: document.getElementById('slotFontSizeOut'),
   rowPins: document.getElementById('rowPins'),
-  resultMode: document.getElementById('resultMode'),
-  targetSlot: document.getElementById('targetSlot'),
   drop: document.getElementById('drop'), auto10: document.getElementById('auto10'), auto100: document.getElementById('auto100'), reset: document.getElementById('reset'),
   runTests: document.getElementById('runTests'), testsOut: document.getElementById('testsOut'),
   bal: document.getElementById('bal'), last: document.getElementById('last'), pl: document.getElementById('pl'), nonce: document.getElementById('nonce'),
@@ -99,13 +94,10 @@ const ui = {
   edgeBias: document.getElementById('edgeBias'), edgeBiasOut: document.getElementById('edgeBiasOut'),
   winpct: document.getElementById('winpct'),
   houseEdge: document.getElementById('houseEdge'), houseEdgeOut: document.getElementById('houseEdgeOut'),
-  house: document.getElementById('house'),
-  testBadge: document.getElementById('testBadge')
+  house: document.getElementById('house')
 };
-const adminControls = Array.from(document.querySelectorAll('.admin-only'));
 
 let state = {
-  playMode: ui.playMode.value,
   rows: +ui.rows.value,
   startPins: +ui.startPins.value,
   risk: ui.risk.value,
@@ -113,15 +105,11 @@ let state = {
   seed: ui.seed.value,
   dropOffset: +ui.dropOffset.value,
   dropWidth: +ui.dropWidth.value,
-  spawnMode: ui.spawnMode.value,
-  spawnPos: +ui.spawnPos.value,
   speed: +ui.speed.value,
   spacingX: +ui.spacingX.value,
   spacingY: +ui.spacingY.value,
   slotFontSize: +ui.slotFontSize.value,
   rowPins: [],
-  resultMode: 'random',
-  targetSlot: 0,
   balance: 1000000,
   profit: 0,
   nonce: 0,
@@ -149,15 +137,6 @@ let state = {
 function radii(){ return { BALL: 8*dpr, PEG: 6*dpr }; }
 
 function rebuild(){
-  state.playMode = ui.playMode.value;
-  const isAdmin = state.playMode === 'admin';
-  if(!isAdmin){
-    ui.spawnMode.value = 'random';
-    ui.resultMode.value = 'random';
-  }
-  for(const el of adminControls) el.classList.toggle('hidden', !isAdmin);
-  ui.testBadge.classList.toggle('hidden', !isAdmin);
-
   state.rows=+ui.rows.value; ui.rowsOut.textContent=state.rows;
   state.startPins = +ui.startPins.value; ui.startPinsOut.textContent = state.startPins;
   state.risk=ui.risk.value;
@@ -167,16 +146,10 @@ function rebuild(){
   state.seed=ui.seed.value;
   state.dropOffset = +ui.dropOffset.value; ui.dropOffsetOut.textContent = `${state.dropOffset.toFixed(0)}px`;
   state.dropWidth = Math.max(1, Math.min(100, +ui.dropWidth.value || 100)); ui.dropWidthOut.textContent = `${state.dropWidth.toFixed(0)}%`;
-  state.spawnMode = isAdmin ? ui.spawnMode.value : 'random';
-  state.spawnPos = Math.max(0, Math.min(100, +ui.spawnPos.value || 50));
-  ui.spawnPos.value = String(state.spawnPos);
-  ui.spawnPosOut.textContent = `${state.spawnPos.toFixed(0)}%`;
   state.speed=+ui.speed.value; ui.speedOut.textContent=state.speed.toFixed(1)+'×';
   state.spacingX = +ui.spacingX.value; ui.spacingXOut.textContent = state.spacingX.toFixed(2)+'×';
   state.spacingY = +ui.spacingY.value; ui.spacingYOut.textContent = state.spacingY.toFixed(2)+'×';
   state.slotFontSize = +ui.slotFontSize.value; ui.slotFontSizeOut.textContent = `${state.slotFontSize}px`;
-  state.resultMode = isAdmin ? ui.resultMode.value : 'random';
-  state.targetSlot = Math.max(0, Math.round(+ui.targetSlot.value || 0));
   state.rowPins = buildRowPins(state.rows, state.startPins, ui.rowPins.value);
   // Keep user-defined values, auto-fill missing rows with defaults, and mirror back to input.
   ui.rowPins.value = state.rowPins.join(',');
@@ -184,10 +157,6 @@ function rebuild(){
   const slotCount = (state.rowPins[state.rowPins.length-1] || state.startPins) + 1;
   state.slotProbs = buildSlotProbs(state.rows, slotCount);
   state.multipliers = makeMultipliers(state.slotProbs, state.risk, state.rtp, state.edgeBias);
-  const maxSlotIdx = Math.max(0, state.slotProbs.length - 1);
-  state.targetSlot = Math.min(state.targetSlot, maxSlotIdx);
-  ui.targetSlot.max = String(maxSlotIdx);
-  ui.targetSlot.value = String(state.targetSlot);
   state.hits = new Array(state.slotProbs.length).fill(0);
   ui.bal.textContent = state.balance.toFixed(2); ui.pl.textContent = (state.profit>=0?'+':'') + state.profit.toFixed(2); ui.house.textContent = state.house.toFixed(2);
   layoutBoard();
@@ -285,13 +254,10 @@ function getSpawnConfig(rng){
   const minStart = Math.max(fullMin, zoneMin);
   const maxStart = Math.min(fullMax, zoneMax);
   let spawnX = centerX;
-  if(state.spawnMode === 'preset'){
-    const t = Math.max(0, Math.min(1, (state.spawnPos || 0) / 100));
-    spawnX = minStart + (maxStart - minStart) * t;
-  }else if(rng){
+  if(rng){
     const range = Math.max(1, maxStart - minStart);
-    // Use full-width randomization; in random mode, boost chance near edges.
-    const edgeBoost = state.resultMode === 'random' ? 0.55 : 0.30;
+    // Use full-width randomization with boosted chance near edges.
+    const edgeBoost = 0.55;
     if(rng() < edgeBoost){
       const edgeBand = range * 0.28;
       const onLeft = rng() < 0.5;
@@ -358,33 +324,8 @@ function drawBalls(){
 }
 function draw(){ if(!(W>0 && H>0)) return; ctx.clearRect(0,0,W,H); drawBG(); drawPegs(); drawSlots(); drawSpawnPreview(); drawBalls(); }
 
-// ---------- Deterministic Path Simulation ----------
+// ---------- Ball Simulation ----------
 const FADE_MS = 800;
-
-function pickForcedSlot(){
-  const slots = state.slotProbs.length;
-  if(slots<=0) return null;
-  if(state.resultMode === 'preset'){
-    return Math.max(0, Math.min(slots-1, state.targetSlot));
-  }
-  return null;
-}
-
-function pickTargetSlot(){
-  const slots = state.slotProbs.length;
-  if(slots<=0) return 0;
-  const forced = pickForcedSlot();
-  if(Number.isInteger(forced)) return Math.max(0, Math.min(slots-1, forced)); // 0 = leftmost
-  // In random mode, sample slot by configured probabilities.
-  const rng = makeRNG(state.seed, state.nonce);
-  const r = rng();
-  let acc = 0;
-  for(let i=0;i<slots;i++){
-    acc += (state.slotProbs[i] || 0);
-    if(r <= acc) return i;
-  }
-  return slots - 1;
-}
 
 const physics = {
   gravity: 2200,
@@ -393,116 +334,19 @@ const physics = {
   floorBounce: 0.35
 };
 
-function simulateLanding(startX, startY, initVx, nonce, targetSlot){
-  const {BALL} = radii();
-  const rng = makeRNG(state.seed, nonce);
-  const sim = { x:startX, y:startY, vx:initVx, vy:0, floorHits:0, rng };
-  const simDt = 1/120;
-  const maxSteps = 1800;
-  let best = 0, bestd = Infinity;
-
-  for(let step=0; step<maxSteps; step++){
-    sim.vy += physics.gravity * state.speed * (dpr/1) * simDt;
-    sim.vx += (sim.rng() - 0.5) * 22 * simDt * state.speed;
-    sim.x += sim.vx * simDt;
-    sim.y += sim.vy * simDt;
-    sim.vx *= physics.friction;
-
-    const env = getEnvelopeAtY(sim.y);
-    const minX = env.min + BALL;
-    const maxX = env.max - BALL;
-    if(sim.x < minX){ sim.x = minX; sim.vx = Math.abs(sim.vx) * 0.35; }
-    if(sim.x > maxX){ sim.x = maxX; sim.vx = -Math.abs(sim.vx) * 0.35; }
-
-    for(const row of state.pegs){
-      for(const p of row){
-        const dx = sim.x - p.x, dy = sim.y - p.y;
-        const dist = Math.hypot(dx,dy);
-        const minD = BALL + p.r;
-        if(dist>0 && dist < minD){
-          const nX = dx/dist, nY = dy/dist;
-          const overlap = (minD - dist) + 0.01;
-          sim.x += nX * overlap;
-          sim.y += nY * overlap;
-          const vn = sim.vx*nX + sim.vy*nY;
-          sim.vx -= (1+physics.restitution)*vn*nX;
-          sim.vy -= (1+physics.restitution)*vn*nY;
-          sim.vx += (sim.rng()-0.5) * 24 * state.speed;
-        }
-      }
-    }
-
-    const floor = state.floorY - BALL;
-    if(sim.y >= floor){
-      sim.y = floor;
-      sim.floorHits++;
-      if(Math.abs(sim.vy) > 110 && sim.floorHits <= 4){
-        sim.vy = -Math.abs(sim.vy) * physics.floorBounce;
-        sim.vx *= 0.82;
-      }else{
-        for(let i=0;i<state.slotsX.length;i++){
-          const d = Math.abs(sim.x - state.slotsX[i]);
-          if(d<bestd){ bestd=d; best=i; }
-        }
-        return {slot:best, x:sim.x, dist:Math.abs(best - targetSlot)};
-      }
-    }
-  }
-
-  for(let i=0;i<state.slotsX.length;i++){
-    const d = Math.abs(sim.x - state.slotsX[i]);
-    if(d<bestd){ bestd=d; best=i; }
-  }
-  return {slot:best, x:sim.x, dist:Math.abs(best - targetSlot)};
-}
-
-function solvePresetInitialVx(startX, startY, targetSlot, nonce){
-  // Search initial horizontal velocity so pure physics lands on target slot.
-  const maxV = 1200 * state.speed;
-  let bestVx = 0;
-  let bestErr = Infinity;
-  let bestDistX = Infinity;
-
-  const test = (vx)=>{
-    const r = simulateLanding(startX, startY, vx, nonce, targetSlot);
-    const err = Math.abs(r.slot - targetSlot);
-    const dx = Math.abs((state.slotsX[targetSlot] ?? startX) - r.x);
-    if(err < bestErr || (err === bestErr && dx < bestDistX)){
-      bestErr = err;
-      bestDistX = dx;
-      bestVx = vx;
-    }
-  };
-
-  for(let i=0;i<=20;i++){
-    const t = i/20;
-    test(-maxV + (2*maxV*t));
-  }
-  const refineSpan = Math.max(80, maxV * 0.22);
-  for(let i=0;i<=14;i++){
-    const t = i/14;
-    test((bestVx - refineSpan) + (2*refineSpan*t));
-  }
-  return bestVx;
-}
-
 function spawnBall(){
   const rng = makeRNG(state.seed, state.nonce);
   const spawnCfg = getSpawnConfig(rng);
   const startX = spawnCfg.spawnX;
   const spawnY = spawnCfg.spawnY;
 
-  const targetSlot = pickTargetSlot();
-  const targetX = state.slotsX[targetSlot] ?? (W/2);
-  const initialVx = state.resultMode === 'preset'
-    ? solvePresetInitialVx(startX, spawnY, targetSlot, state.nonce)
-    : (rng() - 0.5) * 180 * state.speed;
+  const initialVx = (rng() - 0.5) * 180 * state.speed;
   const b = {
     x: startX, y: spawnY,
     vx: initialVx, vy: 0,
     rng,
     finished: false, slot: null, removeAt: null,
-    targetSlot, targetX, floorHits: 0
+    floorHits: 0
   };
   state.balls.push(b);
 }
@@ -645,15 +489,12 @@ function runSelfTests(){ const out = []; const ok = (name, cond)=> out.push(`${c
 
 // ---------- Wiring ----------
 ui.rows.addEventListener('input', rebuild);
-ui.playMode.addEventListener('change', rebuild);
 ui.startPins.addEventListener('input', ()=>{
   // Regenerate row pins from startPins defaults for immediate layout change.
   ui.rowPins.value = '';
   rebuild();
 });
 ui.rowPins.addEventListener('change', rebuild);
-ui.resultMode.addEventListener('change', rebuild);
-ui.targetSlot.addEventListener('input', rebuild);
 ui.risk.addEventListener('change', rebuild);
 ui.rtp.addEventListener('input', ()=>{ state.rtp = +ui.rtp.value; state.houseEdge = +(100 - state.rtp).toFixed(1); ui.rtpOut.textContent = state.rtp+'%'; ui.houseEdge.value = String(state.houseEdge); ui.houseEdgeOut.textContent = state.houseEdge.toFixed(1)+'%'; state.multipliers = makeMultipliers(state.slotProbs, state.risk, state.rtp, state.edgeBias); renderMeter(); updateWinPct(); requestDraw(); });
 ui.houseEdge.addEventListener('input', ()=>{ state.houseEdge = +ui.houseEdge.value; ui.houseEdgeOut.textContent = state.houseEdge.toFixed(1)+'%'; state.rtp = +(100 - state.houseEdge).toFixed(1); ui.rtp.value = String(state.rtp); ui.rtpOut.textContent = state.rtp+'%'; state.multipliers = makeMultipliers(state.slotProbs, state.risk, state.rtp, state.edgeBias); renderMeter(); updateWinPct(); requestDraw(); });
@@ -669,15 +510,6 @@ ui.dropWidth.addEventListener('input', ()=>{
   state.dropWidth = Math.max(1, Math.min(100, +ui.dropWidth.value || 100));
   ui.dropWidth.value = String(state.dropWidth);
   ui.dropWidthOut.textContent = `${state.dropWidth.toFixed(0)}%`;
-  requestDraw();
-});
-ui.spawnMode.addEventListener('change', ()=>{
-  state.spawnMode = ui.spawnMode.value;
-  requestDraw();
-});
-ui.spawnPos.addEventListener('input', ()=>{
-  state.spawnPos = Math.max(0, Math.min(100, +ui.spawnPos.value || 0));
-  ui.spawnPosOut.textContent = `${state.spawnPos.toFixed(0)}%`;
   requestDraw();
 });
 ui.speed.addEventListener('input', ()=>{ state.speed=+ui.speed.value; ui.speedOut.textContent=state.speed.toFixed(1)+'×'; });
